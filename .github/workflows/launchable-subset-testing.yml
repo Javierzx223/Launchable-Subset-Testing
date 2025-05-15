@@ -1,0 +1,48 @@
+name: Launchable Subset Testing
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  subset-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install launchable
+      
+      - name: Record build in Launchable
+        env:
+          LAUNCHABLE_TOKEN: ${{ secrets.LAUNCHABLE_TOKEN }}
+        run: |
+          launchable record build --name ${{ github.sha }} .
+      
+      - name: Subset tests with Launchable
+        env:
+          LAUNCHABLE_TOKEN: ${{ secrets.LAUNCHABLE_TOKEN }}
+        run: |
+          launchable subset --target 80% --base ./tests > subset.txt
+      
+      - name: Run subset of tests
+        run: |
+          pytest $(cat subset.txt)
+      
+      - name: Record test results in Launchable
+        env:
+          LAUNCHABLE_TOKEN: ${{ secrets.LAUNCHABLE_TOKEN }}
+        run: |
+          launchable record tests --session launchable:$(date +%s) -- pytest .
